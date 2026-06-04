@@ -15,75 +15,72 @@ CONFIGURACION = {
 }
 
 def analizar_con_ia(titulo, resumen):
-    """Pregunta a Groq si la noticia es una alerta de seguridad real."""
-    prompt = f"""
-    Eres un analista de seguridad experto. Analiza esta noticia y responde SOLO con la palabra 'SI' si se trata de:
-    - Violencia (balaceras, robos, asaltos, ejecuciones).
-    - Riesgos viales graves (bloqueos, choques mayores, cierres de carreteras).
-    - Desastres naturales (sismos, inundaciones, tormentas).
-    - Operativos policiales o persecuciones.
-
-    Responde 'NO' si es política, deportes, eventos programados, clima normal o noticias generales sin riesgo inminente.
-
-    NOTICIA: {titulo}
-    RESUMEN: {resumen}
-
-    Respuesta (SI/NO):"""
-
+    prompt = f"""Analiza si esta noticia es una alerta de SEGURIDAD, ACCIDENTE VIAL o DESASTRE NATURAL. 
+    Responde SOLO 'SI' o 'NO'. 
+    Noticia: {titulo} {resumen}"""
     try:
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=2,
-            temperature=0
+            max_tokens=2, temperature=0
         )
-        respuesta = completion.choices[0].message.content.strip().upper()
-        return "SI" in respuesta
-    except Exception as e:
-        print(f"⚠️ Error en IA: {e}")
-        return True # Por seguridad, si la IA falla, dejamos pasar la nota
+        return "SI" in completion.choices[0].message.content.strip().upper()
+    except: return True
 
 def extraer_imagen(noticia):
     if 'media_content' in noticia: return noticia.media_content[0]['url']
-    if 'enclosures' in noticia and noticia.enclosures: return noticia.enclosures[0]['href']
     resumen = noticia.get('summary', '')
     img_match = re.search(r'src="([^"]+)"', resumen)
     return img_match.group(1) if img_match else None
 
 def enviar_a_discord(noticia, ciudad, config):
+    if not config['webhook']:
+        print(f"❌ Error: El Webhook de {ciudad} está vacío.")
+        return
+
     img = extraer_imagen(noticia)
     desc = re.sub(r'<[^>]+>', '', noticia.get('summary', ''))[:400]
     
-    payload = {
-        "username": f"VIGILANCIA IA {ciudad}",
-        "embeds": [{
-            "title": f"🚨 {noticia.title}",
-            "url": noticia.link,
-            "description": desc,
-            "color": config['color'],
-            "image": {"url": img} if img else {},
-            "footer": {"text": f"Análisis por IA Groq | {datetime.now().strftime('%I:%M %p')}"}
-        }]
+    # Payload ultra-limpio
+    embed = {
+        "title": f"🚨 {noticia.title[:250]}",
+        "url": noticia.link,
+        "description": desc,
+        "color": config['color'],
+        "footer": {"text": f"Vigilancia IA {ciudad} | {datetime.now().strftime('%I:%M %p')}"}
     }
-    requests.post(config['webhook'], json=payload)
+    
+    if img and img.startswith('http'):
+        embed["image"] = {"url": img}
+
+    payload = {
+        "username": f"ALERTA {ciudad}",
+        "embeds": [embed]
+    }
+
+    try:
+        r = requests.post(config['webhook'], json=payload, timeout=10)
+        if r.status_code in [200, 204]:
+            print(f"🚀 MENSAJE ENTREGADO A DISCORD ({ciudad})")
+        else:
+            print(f"⚠️ Discord rechazó el mensaje ({ciudad}). Código: {r.status_code}, Respuesta: {r.text}")
+    except Exception as e:
+        print(f"💥 Error de conexión con Discord en {ciudad}: {e}")
 
 def ejecutar():
     for ciudad, info in CONFIGURACION.items():
-        print(f"\n--- 🧠 ANALIZANDO {ciudad} CON IA ---")
-        if not info['rss'] or not info['webhook']: continue
+        print(f"\n--- 📡 PROCESANDO {ciudad} ---")
+        if not info['rss'] or not info['webhook']:
+            print(f"⚠️ Faltan datos para {ciudad}. Revisa los Secrets.")
+            continue
 
         feed = feedparser.parse(info['rss'])
-        
-        for noticia in feed.entries[:8]: # Revisamos las 8 más recientes
-            # Primero un filtro rápido de texto para no gastar tokens de IA en cosas obvias
-            print(f"Evaluando: {noticia.title[:50]}...")
-            
-            # Mandamos a la IA a decidir
+        for noticia in feed.entries[:8]:
             if analizar_con_ia(noticia.title, noticia.summary):
+                print(f"✅ IA APROBÓ: {noticia.title[:50]}...")
                 enviar_a_discord(noticia, ciudad, info)
-                print(f"✅ IA APROBÓ: Enviando alerta.")
             else:
-                print(f"❌ IA RECHAZÓ: Ruido detectado.")
+                print(f"❌ IA RECHAZÓ: {noticia.title[:50]}...")
 
 if __name__ == "__main__":
     ejecutar()
