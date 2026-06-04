@@ -1,7 +1,9 @@
 import feedparser
 import requests
 import os
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
+import calendar
 
 # --- CONFIGURACIÓN ---
 RSS_URL = "https://rss.app/feeds/_ML02gz2zhukdQcW6.xml"
@@ -32,47 +34,54 @@ INCIDENTES = [
     "accidente", "choque", "volcadura", "incendio", "explosión", "cierre", 
     "vial", "precaución", "riesgo", "fuga"
 ]
-
-def extraer_imagen(noticia):
-    if 'media_content' in noticia: return noticia.media_content[0]['url']
-    if 'links' in noticia:
-        for link in noticia.links:
-            if 'image' in link.get('type', ''): return link.get('href')
-    return "https://cdn-icons-png.flaticon.com/512/1243/1243911.png" # Icono por defecto
-
 def enviar_a_discord(noticia):
-    fecha_hoy = datetime.now().strftime("%I:%M %p")
+    # (Misma función de envío que ya tienes, pero con color rojo)
     payload = {
-        "username": "ALERTA SEGURIDAD MTY",
+        "username": "MTY SEGURIDAD 24/7",
         "embeds": [{
-            "title": f"⚠️ {noticia.title}",
+            "title": f"🚨 {noticia.title}",
             "url": noticia.link,
             "description": noticia.summary.split('<')[0][:500],
-            "color": 15158332, # Rojo para mayor visibilidad
-            "image": {"url": extraer_imagen(noticia)},
-            "footer": {
-                "text": f"Monitor ZMM | {fecha_hoy}",
-                "icon_url": "https://abs.twimg.com/favicons/twitter.2.ico"
-            }
+            "color": 15158332,
+            "footer": {"text": f"Alerta detectada a las {datetime.now().strftime('%I:%M %p')}"}
         }]
     }
     requests.post(DISCORD_WEBHOOK_URL, json=payload)
 
-def ejecutar():
+def revisar_feed():
+    print(f"🔍 Revisando feed a las {datetime.now().strftime('%H:%M:%S')}")
     feed = feedparser.parse(RSS_URL)
-    for noticia in feed.entries[:15]: # Revisamos un rango más amplio
+    ahora_utc = calendar.timegm(time.gmtime())
+    
+    for noticia in feed.entries[:15]:
         texto = (noticia.title + " " + noticia.summary).lower()
         
-        # LÓGICA DE FILTRADO:
-        # Debe mencionar una ZONA Y un INCIDENTE para evitar ruido de otros estados
-        menciona_zona = any(zona in texto for zona in ZONAS)
-        menciona_incidente = any(inc in texto for inc in INCIDENTES)
-        
-        if menciona_zona and menciona_incidente:
-            # Aquí GitHub Actions no guarda estado por defecto, 
-            # pero el RSS suele actualizarse. 
-            enviar_a_discord(noticia)
-            print(f"🚨 Alerta enviada: {noticia.title}")
+        # Filtro 1: Geografía e Incidentes
+        if any(z in texto for z in ZONAS) and any(i in texto for i in INCIDENTES):
+            
+            # Filtro 2: Tiempo (Solo noticias de los últimos 15 minutos)
+            # Esto evita que te lleguen noticias viejas cada vez que corre el script
+            try:
+                publicado_time = calendar.timegm(noticia.published_parsed)
+                diferencia_minutos = (ahora_utc - publicado_time) / 60
+                
+                if diferencia_minutos <= 15: # Solo si es muy reciente
+                    enviar_a_discord(noticia)
+                    print(f"✅ Noticia enviada: {noticia.title}")
+            except:
+                # Si el RSS no tiene fecha, enviamos por si las dudas
+                enviar_a_discord(noticia)
+
+def ejecutar():
+    # CICLO 1
+    revisar_feed()
+    
+    # ESPERA 3 MINUTOS (180 segundos)
+    print("⏳ Esperando 3 minutos para la segunda revisión...")
+    time.sleep(180)
+    
+    # CICLO 2
+    revisar_feed()
 
 if __name__ == "__main__":
     ejecutar()
