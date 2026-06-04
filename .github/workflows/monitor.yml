@@ -18,6 +18,13 @@ jobs:
       - name: Instalar librerías
         run: pip install feedparser requests
       - name: Ejecutar monitor
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+       env:
+          # Webhooks de Discord
+          WEBHOOK_MTY: ${{ secrets.WEBHOOK_MTY }}
+          WEBHOOK_CDMX: ${{ secrets.WEBHOOK_CDMX }}
+          WEBHOOK_GDL: ${{ secrets.WEBHOOK_GDL }}
+          # Feeds de RSS.app
+          RSS_MTY: ${{ secrets.RSS_MTY }}
+          RSS_CDMX: ${{ secrets.RSS_CDMX }}
+          RSS_GDL: ${{ secrets.RSS_GDL }}
         run: python main.py
