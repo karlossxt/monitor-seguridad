@@ -22,11 +22,7 @@ jobs:
 
       - name: Ejecutar monitor
         env:
-          WEBHOOK_MTY: ${{ secrets.WEBHOOK_MTY }}
-          WEBHOOK_CDMX: ${{ secrets.WEBHOOK_CDMX }}
-          WEBHOOK_GDL: ${{ secrets.WEBHOOK_GDL }}
-          RSS_MTY: ${{ secrets.RSS_MTY }}
-          RSS_CDMX: ${{ secrets.RSS_CDMX }}
-          RSS_GDL: ${{ secrets.RSS_GDL }}
+          WEBHOOK_UNIFICADO: ${{ secrets.WEBHOOK_UNIFICADO }}          
+          RSS_BUNDLE: ${{ secrets.RSS_BUNDLE }}          
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python main.py
