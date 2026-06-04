@@ -1,8 +1,8 @@
-name: Monitor de Seguridad QRO
+name: Monitor de Seguridad Multi-Ciudad
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Se ejecuta cada 5 min aprox.
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Actualizado para evitar el warning
 
       - name: Configurar Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # Actualizado para evitar el warning
         with:
           python-version: '3.9'
 
@@ -22,11 +22,9 @@ jobs:
 
       - name: Ejecutar monitor
         env:
-          # Webhooks de Discord
           WEBHOOK_MTY: ${{ secrets.WEBHOOK_MTY }}
           WEBHOOK_CDMX: ${{ secrets.WEBHOOK_CDMX }}
           WEBHOOK_GDL: ${{ secrets.WEBHOOK_GDL }}
-          # Feeds de RSS.app
           RSS_MTY: ${{ secrets.RSS_MTY }}
           RSS_CDMX: ${{ secrets.RSS_CDMX }}
           RSS_GDL: ${{ secrets.RSS_GDL }}
