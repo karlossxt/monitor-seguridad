@@ -1,4 +1,4 @@
-name: Monitor de Seguridad Multi-Ciudad
+name: Monitor de Seguridad IA
 
 on:
   schedule:
@@ -10,17 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4 # Actualizado para evitar el warning
+        uses: actions/checkout@v4
 
       - name: Configurar Python
-        uses: actions/setup-python@v5 # Actualizado para evitar el warning
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
       - name: Instalar librerías
-        run: pip install feedparser requests
-
-     - name: Instalar librerías
         run: pip install feedparser requests groq
 
       - name: Ejecutar monitor
