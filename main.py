@@ -4,7 +4,7 @@ import os
 
 # Configuraciones desde GitHub Secrets y variables
 RSS_URL = "https://rss.app/feeds/_ML02gz2zhukdQcW6.xml"
-DISCORD_WEBHOOK_URL = os.getenv('https://discordapp.com/api/webhooks/1511866876051980329/uXPEKZk3P6-KM3oPrJT5aLqfcW8kCjXHSOfjf_OUd6AZVmSRMZlMnTVvjAPVJ2zLADoc')
+DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK')
 
 KEYWORDS = ["querétaro", "qro", "bloqueo", "vial", "accidente", "precaución", "carretera", "seguridad"]
 
