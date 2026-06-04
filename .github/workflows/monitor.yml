@@ -20,6 +20,9 @@ jobs:
       - name: Instalar librerías
         run: pip install feedparser requests
 
+     - name: Instalar librerías
+        run: pip install feedparser requests groq
+
       - name: Ejecutar monitor
         env:
           WEBHOOK_MTY: ${{ secrets.WEBHOOK_MTY }}
@@ -28,4 +31,5 @@ jobs:
           RSS_MTY: ${{ secrets.RSS_MTY }}
           RSS_CDMX: ${{ secrets.RSS_CDMX }}
           RSS_GDL: ${{ secrets.RSS_GDL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python main.py
