@@ -9,17 +9,29 @@ from groq import Groq
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 WEBHOOK_URL = os.getenv('WEBHOOK_UNIFICADO')
 RSS_URL = os.getenv('RSS_BUNDLE')
-
 def analizar_con_ia(titulo, resumen):
-    """La IA clasifica la noticia y devuelve un formato estructurado"""
+    """Prompt optimizado para ser más receptivo a noticias de vialidad y seguridad urbana"""
     prompt = f"""
-    Analiza esta noticia y clasifícala. 
-    Devuelve ÚNICAMENTE un objeto JSON con este formato:
+    Eres un monitor de seguridad y vialidad urbana. Tu objetivo es detectar cualquier suceso que afecte la tranquilidad o movilidad.
+    
+    CRITERIOS DE APROBACIÓN (SI):
+    - Accidentes viales, choques, volcaduras, atropellados.
+    - Problemas de infraestructura (socavones, baches grandes, semáforos fallando).
+    - Reportes policiacos (detenciones, persecuciones, operativos, crímenes).
+    - Bloqueos, manifestaciones o tráfico inusual por eventos.
+    - Desastres naturales o clima fuerte (lluvia, sismo).
+
+    CRITERIOS DE RECHAZO (NO):
+    - Publicidad, venta de productos, consejos de salud.
+    - Noticias políticas de opinión o propaganda.
+    - Deportes o espectáculos.
+
+    Devuelve ÚNICAMENTE un objeto JSON:
     {{
         "es_alerta": "SI" o "NO",
-        "ciudad": "MTY", "CDMX", "GDL" o "OTRO",
-        "tipo": "CRIMEN", "VIAL", "NATURAL" o "INFO",
-        "prioridad": "ALTA", "MEDIA" o "BAJA",
+        "ciudad": "MTY", "CDMX", "GDL", "EDOMEX" o "OTRO",
+        "tipo": "SEGURIDAD", "VIAL", "INFRAESTRUCTURA" o "CLIMA",
+        "prioridad": "ALTA" (crimen/choque grave), "MEDIA" (vialidad/obras), "BAJA" (info general),
         "resumen_corto": "máximo 15 palabras"
     }}
     
@@ -30,12 +42,13 @@ def analizar_con_ia(titulo, resumen):
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
-            response_format={{"type": "json_object"}}, # Forzamos respuesta JSON
-            temperature=0
+            response_format={"type": "json_object"},
+            temperature=0.5 # Subimos un poco la temperatura para que no sea tan "rígida"
         )
         return json.loads(completion.choices[0].message.content)
     except:
-        return {"es_alerta": "NO"}
+        # Si falla, por si acaso dejamos pasar la noticia
+        return {"es_alerta": "SI", "ciudad": "DESCONOCIDA", "tipo": "REVISAR", "prioridad": "MEDIA", "resumen_corto": "Error en IA, revisar manualmente"}
 
 def enviar_a_discord(noticia, analisis):
     # Definir colores según prioridad
