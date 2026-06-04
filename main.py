@@ -2,66 +2,82 @@ import feedparser
 import requests
 import os
 import re
+import json
 from datetime import datetime
 from groq import Groq
 
-# --- INICIALIZAR IA ---
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
-CONFIGURACION = {
-    "MTY": {"rss": os.getenv('RSS_MTY'), "webhook": os.getenv('WEBHOOK_MTY'), "color": 15158332},
-    "CDMX": {"rss": os.getenv('RSS_CDMX'), "webhook": os.getenv('WEBHOOK_CDMX'), "color": 3447003},
-    "GDL": {"rss": os.getenv('RSS_GDL'), "webhook": os.getenv('WEBHOOK_GDL'), "color": 15844367}
-}
+WEBHOOK_URL = os.getenv('WEBHOOK_UNIFICADO')
+RSS_URL = os.getenv('RSS_BUNDLE')
 
 def analizar_con_ia(titulo, resumen):
-    prompt = f"¿Esta noticia es una ALERTA de seguridad, accidente o riesgo? Responde SOLO SI o NO. Noticia: {titulo} {resumen}"
+    """La IA clasifica la noticia y devuelve un formato estructurado"""
+    prompt = f"""
+    Analiza esta noticia y clasifícala. 
+    Devuelve ÚNICAMENTE un objeto JSON con este formato:
+    {{
+        "es_alerta": "SI" o "NO",
+        "ciudad": "MTY", "CDMX", "GDL" o "OTRO",
+        "tipo": "CRIMEN", "VIAL", "NATURAL" o "INFO",
+        "prioridad": "ALTA", "MEDIA" o "BAJA",
+        "resumen_corto": "máximo 15 palabras"
+    }}
+    
+    NOTICIA: {titulo} {resumen}
+    """
+
     try:
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=2, temperature=0
+            response_format={{"type": "json_object"}}, # Forzamos respuesta JSON
+            temperature=0
         )
-        return "SI" in completion.choices[0].message.content.strip().upper()
-    except: return True
+        return json.loads(completion.choices[0].message.content)
+    except:
+        return {"es_alerta": "NO"}
 
-def extraer_imagen(noticia):
-    if 'media_content' in noticia: return noticia.media_content[0]['url']
-    img_match = re.search(r'src="([^"]+)"', noticia.get('summary', ''))
-    return img_match.group(1) if img_match else None
-
-def enviar_a_discord(noticia, ciudad, config):
-    # .strip() elimina espacios accidentales que causan el error 401
-    webhook_url = config['webhook'].strip() if config['webhook'] else None
-    if not webhook_url: return
-
-    img = extraer_imagen(noticia)
-    desc = re.sub(r'<[^>]+>', '', noticia.get('summary', ''))[:400]
-    
-    payload = {
-        "username": f"ALERTA {ciudad}",
-        "embeds": [{
-            "title": f"🚨 {noticia.title[:250]}",
-            "url": noticia.link,
-            "description": desc,
-            "color": config['color'],
-            "image": {"url": img} if img else {},
-            "footer": {"text": f"Vigilancia IA {ciudad} | {datetime.now().strftime('%I:%M %p')}"}
-        }]
+def enviar_a_discord(noticia, analisis):
+    # Definir colores según prioridad
+    colores = {
+        "ALTA": 15158332,   # Rojo
+        "MEDIA": 15105570,  # Naranja
+        "BAJA": 3447003     # Azul
     }
     
-    r = requests.post(webhook_url, json=payload)
-    print(f"📡 Resultado {ciudad}: {r.status_code}")
+    prioridad_emoji = "🔴" if analisis['prioridad'] == "ALTA" else "🟠" if analisis['prioridad'] == "MEDIA" else "🔵"
+    
+    payload = {
+        "username": f"CENTRAL IA - {analisis['ciudad']}",
+        "embeds": [{
+            "title": f"{prioridad_emoji} [{analisis['prioridad']}] - {analisis['ciudad']}",
+            "url": noticia.link,
+            "description": f"**{noticia.title}**\n\n{analisis['resumen_corto']}",
+            "color": colores.get(analisis['prioridad'], 0),
+            "fields": [
+                {"name": "📍 Ubicación", "value": analisis['ciudad'], "inline": True},
+                {"name": "📝 Tipo", "value": analisis['tipo'], "inline": True}
+            ],
+            "footer": {"text": f"Detección Inteligente | {datetime.now().strftime('%I:%M %p')}"}
+        }]
+    }
+    requests.post(WEBHOOK_URL, json=payload)
 
 def ejecutar():
-    for ciudad, info in CONFIGURACION.items():
-        print(f"\n--- 📡 PROCESANDO {ciudad} ---")
-        if not info['rss'] or not info['webhook']: continue
-
-        feed = feedparser.parse(info['rss'].strip())
-        for noticia in feed.entries[:8]:
-            if analizar_con_ia(noticia.title, noticia.summary):
-                enviar_a_discord(noticia, ciudad, info)
+    print(f"--- 📡 MONITOR UNIFICADO INICIADO ---")
+    feed = feedparser.parse(RSS_URL)
+    
+    # Procesamos las 10 más recientes del paquete
+    for noticia in feed.entries[:10]:
+        print(f"🧐 Evaluando: {noticia.title[:50]}...")
+        
+        analisis = analizar_con_ia(noticia.title, noticia.summary)
+        
+        if analisis.get("es_alerta") == "SI":
+            enviar_a_discord(noticia, analisis)
+            print(f"✅ ALERTA ENVIADA: {analisis['prioridad']} - {analisis['ciudad']}")
+        else:
+            print("❌ IA descartó por falta de relevancia.")
 
 if __name__ == "__main__":
     ejecutar()
