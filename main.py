@@ -15,9 +15,7 @@ CONFIGURACION = {
 }
 
 def analizar_con_ia(titulo, resumen):
-    prompt = f"""Analiza si esta noticia es una alerta de SEGURIDAD, ACCIDENTE VIAL o DESASTRE NATURAL. 
-    Responde SOLO 'SI' o 'NO'. 
-    Noticia: {titulo} {resumen}"""
+    prompt = f"¿Esta noticia es una ALERTA de seguridad, accidente o riesgo? Responde SOLO SI o NO. Noticia: {titulo} {resumen}"
     try:
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
@@ -29,58 +27,41 @@ def analizar_con_ia(titulo, resumen):
 
 def extraer_imagen(noticia):
     if 'media_content' in noticia: return noticia.media_content[0]['url']
-    resumen = noticia.get('summary', '')
-    img_match = re.search(r'src="([^"]+)"', resumen)
+    img_match = re.search(r'src="([^"]+)"', noticia.get('summary', ''))
     return img_match.group(1) if img_match else None
 
 def enviar_a_discord(noticia, ciudad, config):
-    if not config['webhook']:
-        print(f"❌ Error: El Webhook de {ciudad} está vacío.")
-        return
+    # .strip() elimina espacios accidentales que causan el error 401
+    webhook_url = config['webhook'].strip() if config['webhook'] else None
+    if not webhook_url: return
 
     img = extraer_imagen(noticia)
     desc = re.sub(r'<[^>]+>', '', noticia.get('summary', ''))[:400]
     
-    # Payload ultra-limpio
-    embed = {
-        "title": f"🚨 {noticia.title[:250]}",
-        "url": noticia.link,
-        "description": desc,
-        "color": config['color'],
-        "footer": {"text": f"Vigilancia IA {ciudad} | {datetime.now().strftime('%I:%M %p')}"}
-    }
-    
-    if img and img.startswith('http'):
-        embed["image"] = {"url": img}
-
     payload = {
         "username": f"ALERTA {ciudad}",
-        "embeds": [embed]
+        "embeds": [{
+            "title": f"🚨 {noticia.title[:250]}",
+            "url": noticia.link,
+            "description": desc,
+            "color": config['color'],
+            "image": {"url": img} if img else {},
+            "footer": {"text": f"Vigilancia IA {ciudad} | {datetime.now().strftime('%I:%M %p')}"}
+        }]
     }
-
-    try:
-        r = requests.post(config['webhook'], json=payload, timeout=10)
-        if r.status_code in [200, 204]:
-            print(f"🚀 MENSAJE ENTREGADO A DISCORD ({ciudad})")
-        else:
-            print(f"⚠️ Discord rechazó el mensaje ({ciudad}). Código: {r.status_code}, Respuesta: {r.text}")
-    except Exception as e:
-        print(f"💥 Error de conexión con Discord en {ciudad}: {e}")
+    
+    r = requests.post(webhook_url, json=payload)
+    print(f"📡 Resultado {ciudad}: {r.status_code}")
 
 def ejecutar():
     for ciudad, info in CONFIGURACION.items():
         print(f"\n--- 📡 PROCESANDO {ciudad} ---")
-        if not info['rss'] or not info['webhook']:
-            print(f"⚠️ Faltan datos para {ciudad}. Revisa los Secrets.")
-            continue
+        if not info['rss'] or not info['webhook']: continue
 
-        feed = feedparser.parse(info['rss'])
+        feed = feedparser.parse(info['rss'].strip())
         for noticia in feed.entries[:8]:
             if analizar_con_ia(noticia.title, noticia.summary):
-                print(f"✅ IA APROBÓ: {noticia.title[:50]}...")
                 enviar_a_discord(noticia, ciudad, info)
-            else:
-                print(f"❌ IA RECHAZÓ: {noticia.title[:50]}...")
 
 if __name__ == "__main__":
     ejecutar()
