@@ -4,10 +4,10 @@ import time
 
 # === CONFIGURACIÓN ===
 # Pega aquí tu link de RSS.app
-RSS_URL = "TU_URL_DE_RSS_APP_AQUI" 
+RSS_URL = "https://rss.app/feeds/_ML02gz2zhukdQcW6.xml" 
 
 # Pega aquí la URL que copiaste de Discord
-DISCORD_WEBHOOK_URL = "TU_WEBHOOK_DE_DISCORD_AQUI"
+DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/1511866876051980329/uXPEKZk3P6-KM3oPrJT5aLqfcW8kCjXHSOfjf_OUd6AZVmSRMZlMnTVvjAPVJ2zLADoc"
 
 # Palabras clave que te interesan (puedes agregar las que quieras)
 KEYWORDS = ["querétaro", "qro", "bloqueo", "vial", "accidente", "precaución", "carretera", "seguridad"]
