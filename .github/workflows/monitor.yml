@@ -2,8 +2,8 @@ name: Monitor de Seguridad QRO
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Se ejecuta cada 5 minutos
-  workflow_dispatch:        # Botón para prueba manual
+    - cron: '*/5 * * * *'  # GitHub lo lanzará cada 5 min aprox.
+  workflow_dispatch:
 
 jobs:
   build:
@@ -11,15 +11,12 @@ jobs:
     steps:
       - name: Checkout del código
         uses: actions/checkout@v3
-
       - name: Configurar Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-
       - name: Instalar librerías
         run: pip install feedparser requests
-
       - name: Ejecutar monitor
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
